@@ -1,0 +1,447 @@
+#!/bin/bash
+###################################
+#		  Matrix Functions		  #
+# Author: Bryce hahn			  #
+# Email:	hahnb@oregonstate.edu #
+###################################
+
+
+
+
+#########################################
+#										#
+#		   	Matrix Transpose			#
+#										#
+#########################################
+#
+#	The matrixTranspose function will take 1 matrix pre-stored from read in matrix1.
+#		We use two for loops to iterate through the columns and rows of matrix1,
+#		respectively. This allows us to get the transposition of the provided matrix
+#		which we can then store in a temporary array to print out for grading.
+# Globals: Access to -> mCols1, mRows1, matrix1
+# Return: No return value
+#
+function matrixTranspose() {
+	declare -a tempMatrix #temporary 2D matrix
+	iter=0
+	for ((i=0;i<mCols1;i++)) #iterate through the matrix1 columns first
+	do
+		for ((j=0;j<mRows1;j++)) #iterate through the matrix1 rows last
+		do #this is backwards from the way we filled the matrix
+			tempMatrix[$iter]="${matrix1[$j, $i]}" #set tempmatrix of iter to the
+			printf "%d" ${tempMatrix[$iter]} #current index [i, j] then print with formating
+			if [ $j != $((mRows1-1)) ] #ensure we don't print a tab at the end of the matrix
+			then
+				printf "%s\t"
+			fi
+			iter=$((iter+1)) #update iterator
+		done
+		printf "%s\n" #end all lines of the matrix print with a new line
+	done
+
+}
+
+#########################################
+#										#
+#		       Matrix Mean				#
+#										#
+#########################################
+#
+#	The matrixMean function will take 1 matrix pre-stored from read in matrix1.
+#		We use two for loops to iterate through the columns and rows of matrix1,
+#		respectively. This allows us to summate the values of each column of the
+#		provided matrix, then using the pre-calculated row dimension, we can find
+#		the average of each column, and store it into a 1D array to print with
+#		proper formating for grading.
+#
+# Globals: Access to -> mCols1, mRows1, matrix1
+# Returns: No return value
+#
+function matrixMean() {
+	declare -a tempMatrix #temporary matrix
+
+	for ((i=0;i<mCols1;i++)) #iterate through the matrix1 columns first
+	do #will always be matrix1 because we only take in 1 matrix for arguments
+		avg=0
+		for ((j=0;j<mRows1;j++)) #iterate through the matrix1 rows last
+		do #this is backwards because we need to walk through each row, not column
+			avg=$((avg+matrix1[$j, $i]))
+		done #this next equation was provided on program 1 page. it rounds while averaging my row
+		tempMatrix[$i]=$(((${avg}+(${mRows1}/2)*((${avg}>0)*2-1))/${mRows1}))
+	done
+
+
+	########################
+	# PRINTING FOR GRADING #
+	########################
+
+	for ((i=0;i<mCols1;i++))
+	do
+		printf "%d" ${tempMatrix[$i]}
+		if [ $i != $((mCols1-1)) ] #ensure we don't print a tab at the end of the matrix
+		then
+			printf "%s\t"
+		fi
+	done
+	printf "%s\n"
+}
+
+#########################################
+#										#
+#			  Matrix Add				#
+#										#
+#########################################
+#
+#	The matrixAdd function will take 2 matrices pre-stored from read in matrix1
+#		and matrix2. We use two for loops to iterate through the rows and columns
+#		of matrix1 (and 2) respectively. Since we can use the indeces from the for
+#		loops on both matrices, we only need two forloops. We can then calculate
+#		the sum of the two matrix indeces and store into a temporary array to then
+#		print for grading.
+#
+# Globals: Access to -> mCols1, mRows1, mCols2, mRows2, matrix1, matrix2
+# Returns: Return -1 if inputed matrices do not fit dimensions
+#
+function matrixAdd() {
+	#ensure matrix dimensions fit for addition
+	if [ "$mRows1" != "$mRows2" ] || [ "$mCols1" != "$mCols2" ]
+	then #if the matrices are not the same size, we can not add them together
+		>&2 echo "Error! The matrices provided did not match in dimensions."
+		exit -1
+	fi
+
+	declare -A finalMatrix=() #temporary matrix
+
+	for ((i=0;i<mRows1;i++)) #iterate through rows first
+	do
+		for ((j=0;j<mCols1;j++)) #then iterate through columns
+		do #since we can simply use i and j for both m1 and m2, we only need these 2 for loops
+			finalMatrix[$i, $j]=$((${matrix1[$i, $j]} + ${matrix2[$i, $j]})) #add the two values
+			printf "%d" ${finalMatrix[$i, $j]} #of matrix 1 and 2 together and store in temp for printing
+			if [ $j != $((mCols1-1)) ] #ensure we don't print a tab at the end of the matrix
+			then
+				printf "%s\t"
+			fi
+		done
+		printf "%s\n"
+	done
+}
+
+
+#########################################
+#										#
+#			 Matrix Multiply			#
+#										#
+#########################################
+#
+#	The matrixMultiply function will take 2 matrices pre-stored from read in matrix1
+#		and matrix2. We use three for loops to iterate through the rows and columns
+#		of matrix1 and matrix2, with the 3rd used to keep track of where we will
+#		store the newly calculated products. Once each sum has been multiplied
+# 		(each value for each row and column) we then print for grading.
+#
+# Globals: Access to -> mCols1, mRows1, mCols2, matrix1, matrix2
+# Returns: Return -1 if m1 and m2 are not within proper multiplication dimensions
+#
+function matrixMul() {
+	#ensure matrix dimensions fit for multiplication
+	if [ "$mCols1" != "$mRows2" ]
+	then
+		>&2 echo "Error! The dimensions for the matrices provided are not compatible in matrix multiplication."
+		exit -1
+	fi
+
+	sum=0
+
+	for ((i=0;i<mRows1;i++)) #the size of the first matrix rows
+	do
+		for ((j=0;j<mCols2;j++)) #the size of the second matrix columns
+		do
+			for ((l=0;l<mCols1;l++)) #the size of the first matrix columns
+			do 	# 3 loops are needed to keep track of indices for storing, and for
+				  # walking through each row/column for both matrices
+				matrixSum=$((${matrix1[$i, $l]} * ${matrix2[$l, $j]})) #the prod. of each index
+				sum=$(($sum + $matrixSum)) #add to the sum
+			done
+			########################
+			# PRINTING FOR GRADING #
+			########################
+			printf "%d" $sum
+			if [ $j != $((mCols2-1)) ] #ensure we don't print a tab at the end of the matrix
+			then
+				printf "%s\t"
+			fi
+			sum=0
+		done
+		printf "%s\n"
+	done
+
+}
+
+
+#########################################
+#										#
+#			 Read from File				#
+#										#
+#########################################
+#
+#	The readMatrix1 function will take 1 path to file to be read into a matrix
+#		global. We first check to see if the file even exists, and if the file has
+#		reading permissions! We then need to call a while loop to read each line
+#		of the provided file, until we reach the end of the file. For each line
+#		given, we need to iterate through each element to store in a templist.
+#		We keep track of rows and columns of the matrix as each new line, and
+#		element of each line is read. Once all lines have been stored, we then call
+#		two for loops to iterate through the entirety of the 1D array and store
+#		the values into the matrix1 global to be used in future functions.
+#
+# Globals: Access to -> filep1, mRows1, mCols1, matrix1
+# Returns: Return -1 if file provided is nonexistent or undreadable
+#
+function readMatrix1() {
+	if [[ ! -e "$filep1" ]] || [[ ! -r "$filep1" ]]	#check if the file we want
+	then	#to read is empty, or is it has proper reading permissions
+		>&2 echo "Error! File is undreadable: " $filep1
+		exit -1	#empty file loading, break and end program
+	fi
+
+	declare -a templist
+	iter=0
+
+	while IFS=$'\t' read -r -a line; #while ignoring tabs, read lines
+	do
+		for i in "${line[@]}"
+		do
+			templist[$iter]=$i; #store in the temporary matrix
+			iter=$((iter+1)); #every new matrix item encoutered, increase the columns count
+		done
+		mRows1=$((mRows1+1)); #every new line, increase the rows count
+	done < "$filep1" #while there are more lines to read in $2
+	mCols1=$(($iter/$mRows1)); #after read is done, divide by rows to get proper column count
+
+	iter=0
+	for ((i=0;i<mRows1;i++)) #loop through matrix1 rows
+	do
+		for ((j=0;j<mCols1;j++)) #loop through matrix1 columns
+		do
+			matrix1[$i, $j]="${templist[$iter]}" #store read values in matrix1
+			iter=$((iter+1)); #iterate for every new j, to loop through the 1D array
+		done
+	done
+}
+
+
+#########################################
+#										#
+#			 Read from File				#
+#										#
+#########################################
+#
+#	The readMatrix2 function will take 1 path to file to be read into a matrix
+#		global. We first check to see if the file even exists, and if the file has
+#		reading permissions! We then need to call a while loop to read each line
+#		of the provided file, until we reach the end of the file. For each line
+#		given, we need to iterate through each element to store in a templist.
+#		We keep track of rows and columns of the matrix as each new line, and
+#		element of each line is read. Once all lines have been stored, we then call
+#		two for loops to iterate through the entirety of the 1D array and store
+#		the values into the matrix2 global to be used in future functions.
+#
+# Globals: Access to -> filep2, mRows2, mCols2, matrix2
+# Returns: Return -1 if file provided is nonexistent or undreadable
+#
+function readMatrix2() {
+	if [[ ! -e "$filep2" ]] #check if the file we want to read is empty
+	then
+		>&2 echo "Error! File does not exist: " $filep2
+		exit -1	#empty file loading, break and end program
+	fi
+
+	declare -a templist
+	iter=0
+
+	while IFS=$'\t' read -r -a line; #while ignoring tabs, read lines
+	do
+		for i in "${line[@]}"
+		do
+			templist[$iter]=$i; #store in the temporary list
+			iter=$((iter+1)); #every new matrix item encoutered, increase the columns count
+		done
+		mRows2=$((mRows2+1)); #every new line, increase the rows count
+	done < "$filep2" #while there are more lines to read in $2
+	mCols2=$(($iter/$mRows2)); #after read is done, divide by rows to get proper column count
+
+	iter=0
+	for ((i=0;i<mRows2;i++)) #loop through matrix2 rows
+	do
+		for ((j=0;j<mCols2;j++)) #loop through matrix2 columns
+		do
+			matrix2[$i, $j]="${templist[$iter]}" #store read values in matrix2
+			iter=$((iter+1)); #iterate for every new j, to loop through the 1D array
+		done
+	done
+}
+
+#########################################
+#										#
+#				  MAIN					#
+#										#
+#########################################
+#
+#	The main function will be where we organize the bulk of the program and
+#		argument handling. We will check for empty arguments, too many or too
+#		little arguments for specific functions, and all forms of error checking.
+#		Based on the called arguments, we will call each needed function, and
+#		both (if necessary) read functions to grab both matrices.
+#
+# Globals: Definition of -> mCols1, mRows1, mCols2, mRows2, matrix1, matrix2,
+#								filep1, filep2
+# Returns: Return -1 if any failure is met, else return 0 for successful run
+#
+mRows1=0 #keep track of the matrix dimensions
+mRows2=0
+mCols1=0
+mCols2=0
+filep1=""
+filep2=""
+declare -A matrix1 #-A allows us to fake a 2D matrix
+declare -A matrix2
+
+
+#######################
+#check for 0 arguments#
+#######################
+if [ -z "$1" ] #if arg0 is empty, there can't be anything after
+then
+	>&2 echo "Error! No provided arguments to call"
+	exit -1
+fi
+
+#########################
+#check stdin for pipping#
+#########################
+if [ -z "$2" ] #if the argument 2 (matrix 1) is empty, check stdin
+then
+	filep1="/dev/stdin"
+
+	#test is stdin has anything either
+	if [ -z "$filep1" ]
+	then
+		>&2 echo "Error! We could not find an argument for m1."
+		exit -1
+	fi
+elif [ "$2" ]
+then
+	filep1="$2"
+else #got no input
+	>&2 echo "Error! You did not provide a matrix to m1. Syntax: ./matrix " $1 " m1"
+	exit -1
+fi
+
+
+#Check to see if the first argument ($1) follows the allowed function definitions
+if [ "$1" != "dims" ] && [ "$1" != "transpose" ] && [ "$1" != "mean" ] && [ "$1" != "add" ] && [ "$1" != "multiply" ]
+then
+	>&2 echo "Error! You did not provide a proper matrix function. Use to following: dims : transpose : mean : add : multiply"
+	exit -1
+fi
+
+###############
+#load matrices#
+###############
+
+
+
+####################
+# 2 Arguments Only #
+####################
+if [ "$filep1" ]
+then
+	readMatrix1
+
+	if [ "$1" == "dims" ]
+	then
+		if [ "$3" ] #We can only take in 1 matrix, but we found a 2nd inputed
+		then
+			>&2 echo "Error! You can only run " $1 " with one matrix. Syntax: ./matrix " $1 " m1"
+			exit -1
+		fi
+
+		echo "$mRows1 $mCols1" #print the pre-calculated dims to screen
+		exit 0
+	fi
+
+	if [ "$1" == "transpose" ]
+	then
+		if [ "$3" ] #We can only take in 1 matrix, but we found a 2nd inputed
+		then
+			>&2 echo "Error! You can only run " $1 " with one matrix. Syntax: ./matrix " $1 " m1"
+			exit -1
+		fi
+
+		matrixTranspose
+		exit 0
+	fi
+
+	if [ "$1" == "mean" ]
+	then
+		if [ "$3" ] #We can only take in 1 matrix, but we found a 2nd inputed
+		then
+			>&2 echo "Error! You can only run " $1 " with one matrix. Syntax: ./matrix " $1 " m1"
+			exit -1
+		fi
+
+		matrixMean
+		exit 0
+	fi
+else
+	>&2 echo "Error! You did not provide a matrix to m1. Syntax: ./matrix " $1 " m1"
+	exit -1
+fi
+
+
+if [ -z "$3" ] #if the argument 2 (matrix 1) is empty, check stdin
+then
+	filep2="/dev/stdin"
+
+	#test is stdin has anything either
+	if [ -z "$filep2" ]
+	then
+		>&2 echo "Error! We could not find an argument for m2."
+		exit -1
+	fi
+elif [ "$3" ]
+then
+	filep2="$3"
+else #got no input
+	>&2 echo "Error! You did not provide a matrix for m2."
+	exit -1
+fi
+
+######################
+# 3 Arguments Needed #
+######################
+if [ "$filep2" ] && [ "$filep1" ]
+then
+	readMatrix2
+
+	if [ "$1" == "add" ]
+	then
+		matrixAdd
+		exit 0
+	fi
+
+	if [ "$1" == "multiply" ]
+	then
+		matrixMul
+		exit 0
+	fi
+else
+	>&2 echo "Error! You need two matrices in order to run " $1 ". Syntax: ./matrix " $1 " m1 m2"
+	exit -1
+fi
+
+
+#this is a bad operation. good job you broke it
+>&2 echo "Error! You reached the end, and I have no plan for you. Goodbye"
+exit -1
