@@ -18,43 +18,97 @@ char* initDirectory() {
     directoryName = intstrcat(directoryName, getpid());
     //make the directory
     printf("New directory: %s\n", directoryName);
-    int error = 0;//mkdir(directoryName, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    int error = mkdir(directoryName, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if (!error)
         printf("Directory created\n");
     else {
         printf("Unable to create directory\n");
     }
 
+    strcat(directoryName, "/");
     return directoryName;
 }
 
 char* roomNametoFileName(char* room) {
-    char* filename;
-    int fileiter = 0;
-    srand(time(NULL)); //define seed of the pseudorandom time
+    char* filename = malloc(sizeof(char) * 8);
+    int fileiter = 0, i;
+    printf("DEBUG: %s\n", room);
     // remove all spaces, and add a _room to the end
-    for (int i = 0; i < strlen(room); i++) {
+    for (i = 0; i < strlen(room); i++) {
 		if (room[i] != ' ') { //ignore spaces
 			filename[fileiter] = room[i];
             fileiter++;
 		}
 	}
-    sprintf(filename, "%s%s", filename, "_room");
-    printf("New room file name: %s\n", filename);
+    printf("DEBUG: %s\n", filename);
+    strcat(filename, "_room");
+    //printf("New room file name: %s\n", filename);
     return filename;
 }
 
-struct ROOM* declareRoomConnections(struct ROOM* room) {
+void generateRoomConnections(struct ROOM* rooms) {
+    struct ROOM* A;
+    struct ROOM* B;
+    int i;
+
+    for (i = 0; i < sizeof(rooms); i++) {
+        A = &rooms[i];
+        do {
+            B = &rooms[rand() % sizeof(rooms)];
+        } while ((sizeof(B->connections) > 6) || (A->roomName == B->roomName) || connectionAlreadyExists(*A, *B) == 1);
+
+        connectRoom(*A, *B);
+    }
+}
+
+int connectionAlreadyExists(struct ROOM A, struct ROOM B) {
+    int i;
+    for (i = 0; i < sizeof(A.connections); i++) {
+        if (A.connections[i] == B.roomName) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void connectRoom(struct ROOM A, struct ROOM B) {
+    A.connections[sizeof(A.connections) + 1] = B.roomName;
+    B.connections[sizeof(B.connections) + 1] = A.roomName;
+}
+
+char* nextRandomName(struct ROOM* rooms) {
+    char** leftovers = malloc(sizeof(char*) * sizeof(roomNames));
+    int iter, i, j = 0;
+
+    for (i = 0; i < sizeof(roomNames); i++) {
+        for (j = 0; j < sizeof(rooms); j++) {
+            if (rooms[j].roomName == roomNames[i]) {
+                break; //already taken, go to next name
+            }
+        } //we got out of the second for loop, name is available
+        leftovers[iter] = roomNames[i];
+        iter++;
+    }
+    srand (time(NULL));
+    printf("TEST new name");
+    for (i = 0; i < sizeof(leftovers); i++) {
+        printf("leftovers[%d] = %s", i, leftovers[i]);
+    }
 
 
-    return NULL;
+    //pick random name
+    return leftovers[(rand() % sizeof(leftovers))];
 }
 
 void generateRooms(char* directory) {
     struct ROOM* rooms = malloc(sizeof(struct ROOM) * 7);
-    for (int i = 0; i < 7; i++) { //we need to generate 7 room files
-        rooms[i].roomName = roomNames[1];
-        rooms[i].fileName = roomNametoFileName(roomNames[1]);
+    FILE *fp; //so we can save to file on the fly
+    char* file = directory;
+    int i, j;
+
+    for (i = 0; i < 7; i++) { //we need to generate 7 room files
+        rooms[i].roomName = nextRandomName(rooms);
+        rooms[i].fileName = roomNametoFileName(rooms[i].roomName);
 
         //Get Room Type
         if (i == 0) { //room_type is start
@@ -65,17 +119,39 @@ void generateRooms(char* directory) {
             rooms[i].roomType = "MID_ROOM";
         }
     }
+    //generate room connections and type
+    generateRoomConnections(rooms);
 
-    rooms = declareRoomConnections(rooms);
+    for (i = 0; i < 7; i++) {
+        file = directory;
+        strcat(file, rooms[i].fileName);
+        printf("attempting to open: %s\n", file);
+        fp = fopen(file, "w+");
 
-    //save to file
+        //test if file opened
+        if (!fp) {
+            printf("Error! File was unable to be opened: %s", file);
+            return;
+        }
+
+
+        fprintf(fp, "ROOM NAME: %s\n", rooms[i].roomName);
+
+        for (j = 0; j < sizeof(rooms[i].connections); j++) {
+            fprintf(fp, "CONNECTION %d: %s\n", j, rooms[i].connections[j]);
+        }
+        //sprintf(writeChar, "%s%s", writeChar, rooms[i].roomType);
+        fprintf(fp, "ROOM TYPE: %s", rooms[i].roomType);
+        fclose(fp);
+    }
+
+    //cleanup
+    free(rooms);
 }
 
 int main(int argc, char** argv) {
     //create process directory
     char* dir = initDirectory();
     generateRooms(dir);
-
-
     return 0;
 }
