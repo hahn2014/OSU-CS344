@@ -5,7 +5,35 @@
 **********************************/
 
 //INCLUDES
-#include "hahnb.buildrooms.h"
+#include <time.h> //random integer
+#include <stdlib.h> //random integer
+#include <unistd.h> //printf
+#include <stdio.h> //getting process ID
+#include <sys/stat.h> //making directories
+#include <string.h> //for strcat
+#include <stdio.h>  //writing to files
+#include <time.h>
+
+//global variables
+char* roomNames[] = {
+    "Grand Hall",
+    "West Wing",
+    "East Wing",
+    "Basement",
+    "Billiard",
+    "Garden",
+    "Kitchen",
+    "Master Bedroom",
+    "Garage",
+    "Office",
+};
+
+struct ROOM {
+    char* roomName;
+    char* fileName;
+    char* roomType;
+    char** connections;
+};
 
 char* intstrcat(char* a, int b) {
     static char str[100]; //static to allocate for returning
@@ -78,16 +106,20 @@ void connectRoom(struct ROOM A, struct ROOM B) {
 
 char* nextRandomName(struct ROOM* rooms) {
     char** leftovers = malloc(sizeof(char*) * sizeof(roomNames));
-    int iter, i, j = 0;
+    int iter, isTaken, i, j = 0;
 
     for (i = 0; i < sizeof(roomNames); i++) {
+        isTaken = 0;
         for (j = 0; j < sizeof(rooms); j++) {
             if (rooms[j].roomName == roomNames[i]) {
+                isTaken = 1;
                 break; //already taken, go to next name
             }
         } //we got out of the second for loop, name is available
-        leftovers[iter] = roomNames[i];
-        iter++;
+        if (isTaken == 0) {
+            leftovers[iter] = roomNames[i];
+            iter++;
+        }
     }
     srand (time(NULL));
     printf("TEST new name");

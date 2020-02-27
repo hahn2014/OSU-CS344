@@ -4,8 +4,20 @@
 * Email:    hahnb@oregonstate.edu *
 **********************************/
 
-//INCLUDES
-#include "hahnb.adventure.h"
+//includes
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <String.h>
+#include <dirent.h>
+
+//global variables
+struct ROOM {
+    char* roomName;
+    char* roomType;
+    char** connections;
+};
 
 
 char* getNewestDirectory() {
