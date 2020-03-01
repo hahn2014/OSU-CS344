@@ -1,3 +1,12 @@
+/*******************************************************************************
+ *                                                                             *
+ *                                  SmallSH                                    *
+ *  Filename      : smallsh.c                                                  *
+ *  Author        : Bryce Hahn                                                 *
+ *  Last Modified : 2/27/20                                                    *
+ *                                                                             *
+ *******************************************************************************/
+
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdbool.h> //booleans
