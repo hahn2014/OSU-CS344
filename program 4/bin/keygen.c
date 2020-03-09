@@ -20,11 +20,15 @@ int generateKey(int keylength) {
     srand(time(NULL));
 
     for (i = 0; i < keylength; i++) {
-        key[i] = (char)((rand() % 25) + 65);  //get a range from 65 through 90
+        key[i] = (char)((rand() % 27) + 65);  //get a range from 65 through 91
+
+        if (key[i] == '[') { // replace [ with a space
+            key[i] = ' ';
+        }
+
     }
     key[keylength + 1] = '\n';
     printf("%s\n", key); //print key to stdout
-
     return 0; //safe break
 }
 
