@@ -11,7 +11,7 @@ bool printdebug = false;  //set false for turning in and proper formatting
 
 int generateKey(int keylength) {
     if (printdebug)
-        printf("generating a key of length %i\n", keylength);
+        printf("DEBUG: generating a key of length %i\n", keylength);
 
     char* key = malloc(sizeof(char) * (keylength + 1));
     int i;
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
     if (argc == 2) { //keygen keylength
         return generateKey(atoi(argv[1])); //gen and return break value
     } else {
-        fprintf(stderr, "Error, improper arguments syntax! Syntax is as follows: ./keygen [keylength]\n");
+        fprintf(stderr, "ERROR: Improper arguments syntax! Syntax is as follows: ./keygen [keylength]\n");
         return -1; //fail break
     }
     return 1; //safe break
