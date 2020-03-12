@@ -11,6 +11,7 @@
 #include <netdb.h>
 
 bool printdebug = true;  //set false for turning in and proper formatting
+int charSize = 0;
 
 int openPort(int, char*, char*);
 char* readFile(char*);
@@ -36,12 +37,13 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
         printf("DEBUG: Attempting to open port %i to encrypt %s with the key %s.\n", port, plaintextFile, keyFile);
 
     plaintext = readFile(plaintextFile);
-    textLen   = getBufferSize(plaintext);
+    textLen   = charSize;
     key       = readFile(keyFile);
-    keyLen    = getBufferSize(key);
+    keyLen    = charSize;
+    ping      = malloc(sizeof(char));
 
     if (printdebug)
-        printf("DEBUG: plaintext - %s\nDEBUG: key - %s\n", plaintext, key);
+        printf("DEBUG: plaintext [%i] - %s\nDEBUG: key [%i] - %s\n", textLen, plaintext, keyLen, key);
 
     //make sure key is bigger than plaintext
     if (textLen > keyLen) {
@@ -92,7 +94,7 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
         exit(2);
     }
 
-    // make sure not otp_dec_d though
+    // make sure were not attempting to connect to otp_dec_d
 
     if (printdebug) {
         printf("DEBUG: otp_enc successfully connected to server\n");
@@ -108,7 +110,7 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
     }
 
     // zero out response buffer
-    memset(plaintext, 0, 64000);
+    memset(plaintext, 0, textLen);
 
     do {
         // receive ciphertext from otp_enc_d
@@ -122,6 +124,7 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
 
     if (printdebug) {
         printf("DEBUG: otp_enc received cipher response\n");
+        printf("DEBUG: otp_enc cipher ---> %s\n", plaintext);
     }
 
     // output ciphertext to stdout
@@ -144,11 +147,12 @@ int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLe
     dataSent = write(socketfd, plaintext, textLen);
     if (dataSent < textLen) {
         fprintf(stderr, "ERROR: could not send plaintext to otp_enc_d on port %d\n", port);
-        exit(2);
+        return 2;
     }
 
     if (printdebug) {
-        printf("DEBUG: otp_enc send an %d character plaintext\n", dataSent);
+        printf("DEBUG: otp_enc sent an %d character plaintext\n", dataSent);
+        printf("DEBUG: otp_enc plaintext ---> %s\n", plaintext);
     }
 
     memset(ping, 0, 1);
@@ -157,7 +161,7 @@ int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLe
     dataReceived = read(socketfd, ping, 1);
     if (dataReceived < 0) {
        fprintf(stderr, "ERROR: failed to receive ping from otp_enc_d\n");
-       exit(2);
+       return 2;
     }
 
     if (printdebug) {
@@ -167,12 +171,14 @@ int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLe
     // send key to otp_enc_d
     dataSent = write(socketfd, key, keyLen);
     if (dataSent < keyLen) {
-        fprintf(stderr, "ERROR: filed to send key to otp_enc_d on port %d\n", port);
-        exit(2);
+        fprintf(stderr, "ERROR: failed to send key to otp_enc_d on port %d\n", port);
+        return 2;
     }
 
     if (printdebug) {
-        printf("DEBUG: otp_enc sent an %d character key.\nNow reading response from server...\n", dataSent);
+        printf("DEBUG: otp_enc sent an %d character key.\n", dataSent);
+        printf("DEBUG: otp_enc key ---> %s\n", key);
+        printf("Now reading response from server...\n");
     }
     return 0; //safe break
 }
@@ -196,17 +202,11 @@ char* readFile(char* filename) {
         i++;
     }
     fclose(fp);
-    return buff;
-}
-
-int getBufferSize(char* buff) {
-    int i;
-    for (i = 0; i < sizeof(buff); i++) {
-        if (buff[i] == '\0') {
-            break;
-        }
-    }
-    return i;
+    charSize = i;
+    char* res = malloc(sizeof(char) * i); //dynamically allocated to size of input
+    strncpy(res, buff, i); //copy contents to new array
+    free(buff); //free temporary buffer size
+    return res;
 }
 
 bool isGoodText(char* text) {

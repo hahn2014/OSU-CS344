@@ -17,7 +17,7 @@ bool listening = true;
 //function declarations
 int checkPort(int);
 int listenPort(int, int, int, int, int, char*, char*);
-void encryptText(char*, char*, char*);
+void encryptText(char*, char*, int, char*);
 int getBufferSize(char*);
 
 
@@ -41,14 +41,14 @@ int checkPort(int port) {
 
     // validate port number
     if (port < 0 || port > 65535) {
-        printf("ERROR: otp_enc_d was given an invalid port\n");
+        fprintf(stderr, "ERROR: otp_enc_d was given an invalid port\n");
         return 2; //error break
     }
 
     // Set up the socket
     initSocketFD = socket(AF_INET, SOCK_STREAM, 0); // Create the socket
     if (initSocketFD < 0) {
-        fprintf(stderr, "ERROR: failed to open socket");
+        fprintf(stderr, "ERROR: failed to open socket\n");
     }
 
     // clear out the server address struct
@@ -60,7 +60,7 @@ int checkPort(int port) {
 
     // bind socket to a port
     if (bind(initSocketFD, (struct sockaddr *) &server, sizeof(server)) < 0) {
-        printf("ERROR: otp_enc_d was unable to bind to socket on port %d\n", port);
+        fprintf(stderr, "ERROR: otp_enc_d was unable to bind to socket on port %d\n", port);
         return 2; //error exit
     }
 
@@ -71,7 +71,7 @@ int checkPort(int port) {
 
     // listen for connections
     if (listen(initSocketFD, 5) == -1) {
-        printf("ERROR: otp_enc_d was unable to listen on port %d\n", port);
+        fprintf(stderr, "ERROR: otp_enc_d was unable to listen on port %d\n", port);
         return 2; //error exit
     }
     listening = true;
@@ -84,14 +84,14 @@ int checkPort(int port) {
         //only time listening == false is when connections fail
         listeningSocketFD = accept(initSocketFD, (struct sockaddr *)&client, &clilen); // Accept
         if (listeningSocketFD < 0) {
-            printf("ERROR: opt_enc_d was unable to accept connection\n");
+            fprintf(stderr, "ERROR: opt_enc_d was unable to accept connection\n");
             continue;
         }
         //for every new connection, fork a child process to a new buffer
         spawnPID = fork();
 
         if (spawnPID < 0) {
-            printf("ERROR: opt_enc_d failed to fork!\n");
+            fprintf(stderr, "ERROR: opt_enc_d failed to fork!\n");
         } else if (spawnPID == 0) { //child process
             if (printdebug) {
                 printf("DEBUG: otp_enc_d successfully established connection with client!\n");
@@ -102,16 +102,17 @@ int checkPort(int port) {
             //listen for plaintext and key
             listenPort(listeningSocketFD, dataSent, port, textLen, keyLen, plaintext, key);
             //encrypt text
-            encryptText(plaintext, key, result);
+            encryptText(plaintext, key, textLen, result);
             //send new plaintext to client
             if (printdebug) {
                 printf("DEBUG: otp_enc_d successfully encrypted plaintext, returning cipher to client.\n");
+                printf("DEBUG: otp_enc_d cipher ---> %s\n", plaintext);
             }
 
             // send ciphertext to otp_enc
-            dataSent = write(listeningSocketFD, result, sizeof(result));
-            if (dataSent < sizeof(result)) {
-                printf("ERROR: otp_enc_d failed to write to socket\n");
+            dataSent = write(listeningSocketFD, result, textLen);
+            if (dataSent < textLen) {
+                fprintf(stderr, "ERROR: otp_enc_d failed to write to socket\n");
                 return 2;
             }
 
@@ -135,17 +136,18 @@ int listenPort(int listeningSocketFD, int dataSent, int port, int textLen, int k
     //read plaintext from otp_enc
     textLen = read(listeningSocketFD, plaintext, 64000);
     if (textLen < 0) {
-        printf("ERROR: otp_end_d was unable to read plaintext on port %d\n", port);
+        fprintf(stderr, "ERROR: otp_end_d was unable to read plaintext on port %d\n", port);
         return 2;
     }
 
     if (printdebug) {
         printf("DEBUG: otp_enc_d successfully read an %d character plaintext.\n", textLen);
+        printf("DEBUG: otp_enc_d plaintext ---> %s\n", plaintext);
     }
 
     dataSent = write(listeningSocketFD, "!", 1);
     if (dataSent < 0) {
-        printf("ERROR: otp_enc_d was unable to ping client\n");
+        fprintf(stderr, "ERROR: otp_enc_d was unable to ping client\n");
         return 2;
     }
 
@@ -159,19 +161,20 @@ int listenPort(int listeningSocketFD, int dataSent, int port, int textLen, int k
     //read key from otp_enc
     keyLen = read(listeningSocketFD, key, 64000);
     if (keyLen < 0) {
-        printf("ERROR: otp_end_d could not read key on port %d\n", port);
+        fprintf(stderr, "ERROR: otp_end_d could not read key on port %d\n", port);
         return 2;
     }
 
     if (printdebug) {
-        printf("DEBUG: opt_enc_d successfully read an %d character key.\nNow encrypting...\n", keyLen);
+        printf("DEBUG: opt_enc_d successfully read an %d character key.\n", keyLen);
+        printf("DEBUG: otp_enc_d key ---> %s\n", key);
     }
     return 0;
 }
 
-void encryptText(char* plaintext, char* key, char* result) {
+void encryptText(char* plaintext, char* key, int textLen, char* result) {
     int i;
-    for (i = 0; i < sizeof(plaintext); i++) {
+    for (i = 0; i < textLen; i++) {
         // change spaces to open bracket (65-91)
         if (plaintext[i] == ' ') {
             plaintext[i] = '[';
@@ -179,7 +182,6 @@ void encryptText(char* plaintext, char* key, char* result) {
         if (key[i] == ' ') {
             key[i] = '[';
         }
-
 
         int ptChar = (int)plaintext[i];
         int kChar  = (int)key[i];
@@ -190,17 +192,9 @@ void encryptText(char* plaintext, char* key, char* result) {
 
         // combine key and message using modular addition
         int encrypted = (ptChar + kChar) % 27;
-
         // add 64 back to that range is 64 - 90
-        encrypted = encrypted + 65;
-
         // type conversion back to char
-        result[i] = (char)encrypted + 0;
-
-        // after encryption, change bracket to spaces
-        if (result[i] == '[') {
-            result[i] = ' ';
-        }
+        result[i] = (char)(encrypted + 65);
     }
 }
 
