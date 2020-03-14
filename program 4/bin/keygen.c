@@ -27,7 +27,7 @@ int generateKey(int keylength) {
         }
 
     }
-    key[keylength + 1] = '\n';
+    //key[keylength + 1] = '\n';
     printf("%s\n", key); //print key to stdout
     return 0; //safe break
 }

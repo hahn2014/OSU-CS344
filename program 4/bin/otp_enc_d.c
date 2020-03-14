@@ -11,15 +11,17 @@
 #include <netdb.h>
 
 //attempt to connect to socket, listen for encryption children, cypher text and return
-bool printdebug = true;  //set false for turning in and proper formatting
+bool printdebug = false;  //set false for turning in and proper formatting
 bool listening = true;
+
+int max_size = 100000;
 
 //function declarations
 int checkPort(int);
-int listenPort(int, int, int, int, int, char*, char*);
-void encryptText(char*, char*, int, char*);
+int listenPort(int, int, int, char*, char*);
+char* encryptText(char*, char*, int);
 int getBufferSize(char*);
-
+void clearBuffer(char*);
 
 int checkPort(int port) {
     //socket listening
@@ -28,10 +30,9 @@ int checkPort(int port) {
     int spawnPID;
     int dataSent;
     int textLen;
-    int keyLen;
-    char* plaintext = malloc(sizeof(char) * 64000);
-    char* key       = malloc(sizeof(char) * 64000);
-    char* result    = malloc(sizeof(char) * 64000);
+    char* plaintext = malloc(sizeof(char) * max_size);
+    char* key       = malloc(sizeof(char) * max_size);
+    char* result;
 
     socklen_t clilen;
     struct sockaddr_in server;
@@ -100,13 +101,13 @@ int checkPort(int port) {
             //verify connection from client is infact otp_enc
 
             //listen for plaintext and key
-            listenPort(listeningSocketFD, dataSent, port, textLen, keyLen, plaintext, key);
+            textLen = listenPort(listeningSocketFD, dataSent, port, plaintext, key);
             //encrypt text
-            encryptText(plaintext, key, textLen, result);
+            result = encryptText(plaintext, key, textLen);
             //send new plaintext to client
             if (printdebug) {
                 printf("DEBUG: otp_enc_d successfully encrypted plaintext, returning cipher to client.\n");
-                printf("DEBUG: otp_enc_d cipher ---> %s\n", plaintext);
+                printf("DEBUG: otp_enc_d cipher ---> %s\n", result);
             }
 
             // send ciphertext to otp_enc
@@ -117,7 +118,7 @@ int checkPort(int port) {
             }
 
             if (printdebug) {
-                printf("DEBUG: opt_enc_d sent cipher esponse successfully.\n");
+                printf("DEBUG: opt_enc_d sent cipher response successfully.\n");
             }
 
             // clean up sockets
@@ -129,12 +130,51 @@ int checkPort(int port) {
             close(listeningSocketFD);
         }
     }
+
+    free(plaintext);
+    free(key);
+    free(result);
     return 0; //safe break
 }
 
-int listenPort(int listeningSocketFD, int dataSent, int port, int textLen, int keyLen, char* plaintext, char* key) {
+int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, char* key) {
+    int keyLen;
+    int textLen;
+    int dataReceived;
+    // make sure only otp_enc is connected to us
+    char* veriPing = malloc(sizeof(char));
+    // receive ping from otp_enc
+    dataReceived = read(listeningSocketFD, veriPing, 1);
+
+    if (dataReceived < 0) {
+       fprintf(stderr, "ERROR: failed to receive verification response from otp_enc\n");
+       exit(2);
+    }
+
+    if (printdebug) {
+        printf("DEBUG: otp_enc_d received verification response\n");
+        printf("DEBUG: otp_enc_d verification response ---> %c\n", veriPing[0]);
+    }
+
+    if (veriPing[0] == 'e') { //verification received from otp_enc
+        if (printdebug)
+            printf("DEBUG: otp_enc_d received verification response from otp_enc, continuing...\n");
+    } else { //connected to something other than otp_enc_d
+        fprintf(stderr, "ERROR: otp_enc_d is not connected to a otp_enc process\n");
+        exit (2);
+    }
+
+    free(veriPing);
+
+    dataSent = write(listeningSocketFD, "e", 1); //tell otp_enc we are otp_enc_d
+    if (dataSent < 0) {
+        fprintf(stderr, "ERROR: could not verify connection on port %d\n", port);
+        return 2;
+    }
+
+
     //read plaintext from otp_enc
-    textLen = read(listeningSocketFD, plaintext, 64000);
+    textLen = read(listeningSocketFD, plaintext, max_size);
     if (textLen < 0) {
         fprintf(stderr, "ERROR: otp_end_d was unable to read plaintext on port %d\n", port);
         return 2;
@@ -156,10 +196,10 @@ int listenPort(int listeningSocketFD, int dataSent, int port, int textLen, int k
     }
 
     // zero out buffer
-    memset(key, 0, 64000);
+    memset(key, 0, max_size);
 
     //read key from otp_enc
-    keyLen = read(listeningSocketFD, key, 64000);
+    keyLen = read(listeningSocketFD, key, max_size);
     if (keyLen < 0) {
         fprintf(stderr, "ERROR: otp_end_d could not read key on port %d\n", port);
         return 2;
@@ -169,11 +209,19 @@ int listenPort(int listeningSocketFD, int dataSent, int port, int textLen, int k
         printf("DEBUG: opt_enc_d successfully read an %d character key.\n", keyLen);
         printf("DEBUG: otp_enc_d key ---> %s\n", key);
     }
-    return 0;
+    return textLen;
 }
 
-void encryptText(char* plaintext, char* key, int textLen, char* result) {
+char* encryptText(char* plaintext, char* key, int textLen) {
     int i;
+    int ptChar;
+    int kChar;
+    int encrypted;
+    char* result = malloc(sizeof(char) * textLen);
+
+    if (printdebug)
+        printf("DEBUG: otp_enc_d textLen -> %i\n", textLen);
+
     for (i = 0; i < textLen; i++) {
         // change spaces to open bracket (65-91)
         if (plaintext[i] == ' ') {
@@ -183,18 +231,39 @@ void encryptText(char* plaintext, char* key, int textLen, char* result) {
             key[i] = '[';
         }
 
-        int ptChar = (int)plaintext[i];
-        int kChar  = (int)key[i];
-
-        // subtract 65 so that range is 0 - 26 (27 characters)
-        ptChar = ptChar - 65;
-        kChar  = kChar  - 65;
+        ptChar = (int)plaintext[i]; // convert char to ascii integer value
+        ptChar = ptChar - 65;       // subtract 65 to range from 0-26
+        kChar  = (int)key[i];       // convert char to ascii integer value
+        kChar  = kChar  - 65;       // subtract 65 to range from 0-26
 
         // combine key and message using modular addition
-        int encrypted = (ptChar + kChar) % 27;
+        encrypted = (ptChar + kChar) % 27;
+        encrypted = encrypted + 65;
         // add 64 back to that range is 64 - 90
         // type conversion back to char
-        result[i] = (char)(encrypted + 65);
+        result[i] = (char)encrypted + 0;
+
+        //replace bracket with spaces
+        if (result[i] == '[') {
+            result[i] = ' ';
+        }
+    }
+
+    //debuging cipher value
+    if (printdebug) {
+        printf("DEBUG: otp_enc_d cipher text: ");
+        for (i = 0; i < textLen; i++) {
+            printf("%c", result[i]);
+        }
+        printf("\n");
+    }
+    return result;
+}
+
+void clearBuffer(char* buff) {
+    int i;
+    for (i = 0; i < sizeof(buff); i++) {
+        buff[i] = '\0';
     }
 }
 

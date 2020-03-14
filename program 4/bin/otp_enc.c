@@ -10,8 +10,9 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-bool printdebug = true;  //set false for turning in and proper formatting
+bool printdebug = false;  //set false for turning in and proper formatting
 int charSize = 0;
+int max_size = 100000;
 
 int openPort(int, char*, char*);
 char* readFile(char*);
@@ -53,13 +54,13 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
 
     //validate legitimacy of text
     if (!isGoodText(plaintext)) {
-        fprintf(stderr, "ERROR: otp_enc received bad plaintext input!\n");
+        fprintf(stderr, "ERROR: otp_enc received bad plaintext input! -> %s\n", plaintextFile);
     } else {
         if (printdebug)
             printf("DEBUG: otp_enc received a good plaintext.\n");
     }
     if (!isGoodText(key)) {
-        fprintf(stderr, "ERROR: otp_enc received bad key input!\n");
+        fprintf(stderr, "ERROR: otp_enc received bad key input! -> %s\n", keyFile);
     } else {
         if (printdebug)
             printf("DEBUG: otp_enc received a good key.\n");
@@ -94,8 +95,6 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
         exit(2);
     }
 
-    // make sure were not attempting to connect to otp_dec_d
-
     if (printdebug) {
         printf("DEBUG: otp_enc successfully connected to server\n");
     }
@@ -112,10 +111,8 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
     // zero out response buffer
     memset(plaintext, 0, textLen);
 
-    do {
-        // receive ciphertext from otp_enc_d
-        dataReceived = read(socketfd, plaintext, textLen);
-    } while (dataReceived > 0);
+    // receive ciphertext from otp_enc_d
+    dataReceived = read(socketfd, plaintext, textLen);
 
     if (dataReceived < 0) {
        fprintf(stderr, "ERROR: failed to receive ciphertext from otp_enc_d\n");
@@ -143,6 +140,37 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
 }
 
 int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLen, int keyLen, char* plaintext, char* key, char* ping) {
+    // make sure were not attempting to connect to otp_dec_d
+    char* veriPing = malloc(sizeof(char));
+    dataSent = write(socketfd, "e", 1); //tell otp_enc_d we are otp_enc
+    if (dataSent < 1) {
+        fprintf(stderr, "ERROR: could not verify connection on port %d\n", port);
+        return 2;
+    }
+
+    // receive ping from otp_enc_d
+    dataReceived = read(socketfd, veriPing, 1);
+
+    if (dataReceived < 0) {
+       fprintf(stderr, "ERROR: failed to receive verification response from otp_enc_d\n");
+       exit(2);
+    }
+
+    if (printdebug) {
+        printf("DEBUG: otp_enc received verification response\n");
+        printf("DEBUG: otp_enc verification response ---> %c\n", veriPing[0]);
+    }
+
+    if (veriPing[0] == 'e') { //verification received from otp_enc_d
+        if (printdebug)
+            printf("DEBUG: otp_enc received verification response from otp_enc_d, continuing...\n");
+    } else { //connected to something other than otp_enc_d
+        fprintf(stderr, "ERROR: otp_enc is not connected to a otp_enc_d process\n");
+        exit (2);
+    }
+
+    free(veriPing);
+
     // send plaintext to otp_enc_d
     dataSent = write(socketfd, plaintext, textLen);
     if (dataSent < textLen) {
@@ -185,7 +213,7 @@ int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLe
 
 char* readFile(char* filename) {
     FILE *fp;
-    char* buff = malloc(sizeof(char) * 64000);
+    char* buff = malloc(sizeof(char) * max_size);
     char c;
     int i;
 
@@ -222,10 +250,10 @@ bool isGoodText(char* text) {
 
 
 int main(int argc, char** argv) {
-    if (argc == 4) { //otp_enc plaintext key port
+    if (argc == 4) { //otp_enc plaintext key sendPort
         return openPort(atoi(argv[3]), argv[2], argv[1]);
     } else {
-        fprintf(stderr, "ERROR: Improper arguments syntax! Syntax is as follows: ./otp_enc [plaintext] [key] [outputport]\n");
+        fprintf(stderr, "ERROR: Improper arguments syntax! Syntax is as follows: ./otp_enc [plaintext] [key] [sendPort]\n");
         return -1; //fail break
     }
     return 1; //safe break
