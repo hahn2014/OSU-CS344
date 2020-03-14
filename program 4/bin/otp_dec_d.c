@@ -1,3 +1,13 @@
+/*******************************************************************************
+ *                                                                             *
+ *                           OTP Decryption Deamon                             *
+ *  Filename      : otp_dec_d.c                                                *
+ *  Author        : Bryce Hahn                                                 *
+ *  Last Modified : 3/13/20                                                    *
+ *                                                                             *
+ *  Listens for otp_dec child process to decrypt a ciphertext message, and     *
+ *      returns the converted plaintext.                                       *
+ *******************************************************************************/
 #include <stdio.h>      /* printf, fgets */
 #include <stdlib.h>     //      --
 #include <stdlib.h>     /* atoi */
@@ -20,9 +30,16 @@ bool listening = true;
 int checkPort(int);
 int listenPort(int, int, int, char*, char*);
 char* decryptText(char*, char*, int);
-int getBufferSize(char*);
-void clearBuffer(char*);
 
+/*******************************************************************************
+ *                                Check Port                                   *
+ * The checkPort function initiates a server, and listens to otp_dec child     *
+ *      processes to read from. Once found, it reads from client then decrypts *
+ *      provided ciphertext and returns the resulting plaintext.               *
+ *                                                                             *
+ * Arguments: port as the connection port to listen for files                  *
+ * Returns  : int 0 if safe break, 2 fail break                                *
+ *******************************************************************************/
 int checkPort(int port) {
     //socket listening
     int initSocketFD;
@@ -137,6 +154,19 @@ int checkPort(int port) {
     return 0; //safe break
 }
 
+
+/*******************************************************************************
+ *                                 Listen Port                                 *
+ * The listPort function first verifies that the connection made was to a      *
+ *      otp_dec process, then listens for plaintext and key from clients to    *
+ *      return for encryption.                                                 *
+ *                                                                             *
+ * Arguments: listeningSocketFD as socket connection, dataSent as a means to   *
+ *              get text size, port as the sending port (mostly debug),        *
+ *              ciphertext as the char* of the original ciphertext, key as the *
+ *              char* of the key for decryption                                *
+ * Returns  : int 0 if safe break                                              *
+ *******************************************************************************/
 int listenPort(int listeningSocketFD, int dataSent, int port, char* ciphertext, char* key) {
     int keyLen;
     int textLen;
@@ -212,6 +242,15 @@ int listenPort(int listeningSocketFD, int dataSent, int port, char* ciphertext, 
     return textLen;
 }
 
+/*******************************************************************************
+ *                                Decrypt Text                                 *
+ * The decryptText function decrypts a provided ciphertext with the provided   *
+ *      key and returns the calculated plaintext.                              *
+ *                                                                             *
+ * Arguments: ciphertext as the char* to the ciphertext, key as the char* to   *
+ *              then key, textLen as the length of the original plaintext.     *
+ * Returns  : char* to the new resultant plaintext                            *
+ *******************************************************************************/
 char* decryptText(char* ciphertext, char* key, int textLen) {
     int i;
     int ptChar;
@@ -264,22 +303,6 @@ char* decryptText(char* ciphertext, char* key, int textLen) {
     return result;
 }
 
-void clearBuffer(char* buff) {
-    int i;
-    for (i = 0; i < sizeof(buff); i++) {
-        buff[i] = '\0';
-    }
-}
-
-int getBufferSize(char* buff) {
-    int i;
-    for (i = 0; i < sizeof(buff); i++) {
-        if (buff[i] == '\0') {
-            break;
-        }
-    }
-    return i;
-}
 
 int main(int argc, char** argv) {
     if (argc == 2) { // otp_dec_d listeningport

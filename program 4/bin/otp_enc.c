@@ -1,3 +1,14 @@
+/*******************************************************************************
+ *                                                                             *
+ *                                 OTP Encryption                              *
+ *  Filename      : otp_enc.c                                                  *
+ *  Author        : Bryce Hahn                                                 *
+ *  Last Modified : 3/13/20                                                    *
+ *                                                                             *
+ *  Attempts to connect to otp_enc_d, vefifying connection is valid, then      *
+ *      sends plaintext and key to otp_enc_d to be encrypted. Listening for a  *
+ *      response cipher from otp_enc_d.                                        *
+ *******************************************************************************/
 #include <stdio.h>      /* printf, fgets */
 #include <stdlib.h>     //      --
 #include <stdlib.h>     /* atoi */
@@ -18,8 +29,18 @@ int openPort(int, char*, char*);
 char* readFile(char*);
 bool isGoodText(char*);
 int sendFiles(int, int, int, int, int, int, char*, char*, char*);
-int getBufferSize(char*);
 
+/*******************************************************************************
+ *                                 Open Port                                   *
+ * The openPort function initiates a client to connect to a encryption deamon  *
+ *      and verifies that the connected process is infact a otp_enc_d process  *
+ *      then waits for a responce from otp_enc_d for the resulting ciphertext. *
+ *                                                                             *
+ * Arguments: port as the connection port to send files, keyFile as the file   *
+ *              name for the key text, plaintextFile as the filename for the   *
+ *              plaintext file.                                                *
+ * Returns  : int 0 if safe break, 2 fail break                                *
+ *******************************************************************************/
 int openPort(int port, char* keyFile, char* plaintextFile) {
     int i;
     int socketfd;
@@ -139,6 +160,18 @@ int openPort(int port, char* keyFile, char* plaintextFile) {
     return 0;
 }
 
+/*******************************************************************************
+ *                                 Send Files                                  *
+ * The sendFiles function first verifies the connected process is a otp_enc_d  *
+ *      process, then sends the plaintext and key to be encrypted.             *
+ *                                                                             *
+ * Arguments: dataSent as the number of bytes sent to server, dataReceived as  *
+ *              the bytes received from server, port as the send/receive port, *
+ *              textLen as the size of the sent plaintext, keyLen as the size  *
+ *              of the sent key, plaintext as the char* to the plaintext, key  *
+ *              as the char* to the key, ping as the char* to the ping mem.    *
+ * Returns  : int 0 if safe break                                              *
+ *******************************************************************************/
 int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLen, int keyLen, char* plaintext, char* key, char* ping) {
     // make sure were not attempting to connect to otp_dec_d
     char* veriPing = malloc(sizeof(char));
@@ -211,6 +244,14 @@ int sendFiles(int dataSent, int dataReceived, int socketfd, int port, int textLe
     return 0; //safe break
 }
 
+/*******************************************************************************
+ *                                  Read File                                  *
+ * The readFile function takes a given filename and reads all the content of   *
+ *      the file into a char* and returns the read file.                       *
+ *                                                                             *
+ * Arguments: filename as the string to the file to read                       *
+ * Returns  : resulting opened file contents                                   *
+ *******************************************************************************/
 char* readFile(char* filename) {
     FILE *fp;
     char* buff = malloc(sizeof(char) * max_size);
@@ -237,6 +278,14 @@ char* readFile(char* filename) {
     return res;
 }
 
+/*******************************************************************************
+ *                                Is Good Text                                 *
+ * The isGoodText function takes a given char* and verifies that the contents  *
+ *      of the string are within (A-Z) and " "                                 *
+ *                                                                             *
+ * Arguments: text as the text to verify                                       *
+ * Returns  : True if valid (A-Z) or Space                                     *
+ *******************************************************************************/
 bool isGoodText(char* text) {
     int i;
     for (i = 0; i < sizeof(text); i++) {

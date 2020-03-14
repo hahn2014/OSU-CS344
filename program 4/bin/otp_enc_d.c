@@ -1,3 +1,13 @@
+/*******************************************************************************
+ *                                                                             *
+ *                           OTP Encryption Deamon                             *
+ *  Filename      : otp_enc_d.c                                                *
+ *  Author        : Bryce Hahn                                                 *
+ *  Last Modified : 3/13/20                                                    *
+ *                                                                             *
+ *  Listens for otp_enc child process to encrypt a plaintext message, and      *
+ *      returns the converted ciphertext.                                      *
+ *******************************************************************************/
 #include <stdio.h>      /* printf, fgets */
 #include <stdlib.h>     //      --
 #include <stdlib.h>     /* atoi */
@@ -20,9 +30,16 @@ int max_size = 100000;
 int checkPort(int);
 int listenPort(int, int, int, char*, char*);
 char* encryptText(char*, char*, int);
-int getBufferSize(char*);
-void clearBuffer(char*);
 
+/*******************************************************************************
+ *                                Check Port                                   *
+ * The checkPort function initiates a server, and listens to otp_enc child     *
+ *      processes to read from. Once found, it reads from client then encrypts *
+ *      provided plaintext and returns the resulting ciphertext.               *
+ *                                                                             *
+ * Arguments: port as the connection port to listen for files                  *
+ * Returns  : int 0 if safe break, 2 fail break                                *
+ *******************************************************************************/
 int checkPort(int port) {
     //socket listening
     int initSocketFD;
@@ -30,9 +47,9 @@ int checkPort(int port) {
     int spawnPID;
     int dataSent;
     int textLen;
-    char* plaintext = malloc(sizeof(char) * max_size);
-    char* key       = malloc(sizeof(char) * max_size);
-    char* result;
+    char* plaintext = malloc(sizeof(char) * max_size); //store plaintext from client
+    char* key       = malloc(sizeof(char) * max_size); //store key from client
+    char* result; //resulting ciphertext to send to client
 
     socklen_t clilen;
     struct sockaddr_in server;
@@ -83,22 +100,20 @@ int checkPort(int port) {
 
     while (listening) {
         //only time listening == false is when connections fail
-        listeningSocketFD = accept(initSocketFD, (struct sockaddr *)&client, &clilen); // Accept
+        listeningSocketFD = accept(initSocketFD, (struct sockaddr *)&client, &clilen); // Accept connection
         if (listeningSocketFD < 0) {
             fprintf(stderr, "ERROR: opt_enc_d was unable to accept connection\n");
             continue;
         }
         //for every new connection, fork a child process to a new buffer
-        spawnPID = fork();
+        spawnPID = fork(); //this allows for multitasking
 
-        if (spawnPID < 0) {
+        if (spawnPID < 0) { //fork failed
             fprintf(stderr, "ERROR: opt_enc_d failed to fork!\n");
         } else if (spawnPID == 0) { //child process
             if (printdebug) {
                 printf("DEBUG: otp_enc_d successfully established connection with client!\n");
             }
-
-            //verify connection from client is infact otp_enc
 
             //listen for plaintext and key
             textLen = listenPort(listeningSocketFD, dataSent, port, plaintext, key);
@@ -130,13 +145,25 @@ int checkPort(int port) {
             close(listeningSocketFD);
         }
     }
-
+    //memory cleanup
     free(plaintext);
     free(key);
     free(result);
     return 0; //safe break
 }
 
+/*******************************************************************************
+ *                                 Listen Port                                 *
+ * The listPort function first verifies that the connection made was to a      *
+ *      otp_enc process, then listens for plaintext and key from clients to    *
+ *      return for encryption.                                                 *
+ *                                                                             *
+ * Arguments: listeningSocketFD as socket connection, dataSent as a means to   *
+ *              get text size, port as the sending port (mostly debug),        *
+ *              plaintext as the char* of the original plaintext, key as the   *
+ *              char* of the key for encryption                                *
+ * Returns  : int 0 if safe break                                              *
+ *******************************************************************************/
 int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, char* key) {
     int keyLen;
     int textLen;
@@ -146,7 +173,7 @@ int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, c
     // receive ping from otp_enc
     dataReceived = read(listeningSocketFD, veriPing, 1);
 
-    if (dataReceived < 0) {
+    if (dataReceived < 0) { //error checking
        fprintf(stderr, "ERROR: failed to receive verification response from otp_enc\n");
        exit(2);
     }
@@ -164,7 +191,7 @@ int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, c
         exit (2);
     }
 
-    free(veriPing);
+    free(veriPing); //memory cleanup
 
     dataSent = write(listeningSocketFD, "e", 1); //tell otp_enc we are otp_enc_d
     if (dataSent < 0) {
@@ -185,7 +212,7 @@ int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, c
         printf("DEBUG: otp_enc_d plaintext ---> %s\n", plaintext);
     }
 
-    dataSent = write(listeningSocketFD, "!", 1);
+    dataSent = write(listeningSocketFD, "!", 1); //send client ping
     if (dataSent < 0) {
         fprintf(stderr, "ERROR: otp_enc_d was unable to ping client\n");
         return 2;
@@ -195,7 +222,7 @@ int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, c
         printf("DEBUG: otp_enc_d successfully pinged client\n");
     }
 
-    // zero out buffer
+    // zero out key buffer
     memset(key, 0, max_size);
 
     //read key from otp_enc
@@ -212,6 +239,15 @@ int listenPort(int listeningSocketFD, int dataSent, int port, char* plaintext, c
     return textLen;
 }
 
+/*******************************************************************************
+ *                                Encrypt Text                                 *
+ * The encryptText function encrypts a provided plaintext with the provided    *
+ *      key and returns the calculated cipher.                                 *
+ *                                                                             *
+ * Arguments: plaintext as the char* to the plaintext, key as the char* to the *
+ *              key, textLen as the length of the original plaintext.          *
+ * Returns  : char* to the new resultant ciphertext                            *
+ *******************************************************************************/
 char* encryptText(char* plaintext, char* key, int textLen) {
     int i;
     int ptChar;
@@ -260,22 +296,6 @@ char* encryptText(char* plaintext, char* key, int textLen) {
     return result;
 }
 
-void clearBuffer(char* buff) {
-    int i;
-    for (i = 0; i < sizeof(buff); i++) {
-        buff[i] = '\0';
-    }
-}
-
-int getBufferSize(char* buff) {
-    int i;
-    for (i = 0; i < sizeof(buff); i++) {
-        if (buff[i] == '\0') {
-            break;
-        }
-    }
-    return i;
-}
 
 int main(int argc, char** argv) {
     if (argc == 2) { // otp_enc_d listeningport
