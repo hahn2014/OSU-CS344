@@ -1,17 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <ctype.h> //for tolower
+#include <string.h> //for strcpy, strcmp, strtok_r
 
 int movie_count = 0;
 
 struct movie {
     char* title;
-    char* year;
+    int year;
     int langCount;
     char** languages;
     char* rating;
     //for linked-list connectivity (only need a one way link)
     struct movie* next;
+};
+
+struct bestofyear {
+    char* title;
+    int year;
+    float rating;
+    struct bestofyear* next;
+    struct bestofyear* last;
 };
 
 struct movie* addMovie(char* fileLine) {
@@ -28,15 +37,15 @@ struct movie* addMovie(char* fileLine) {
 
     //second token is the movie release year
     token = strtok_r(NULL, ",", &saveptr);
-    currMovie->year = (char*)calloc(strlen(token) + 1, sizeof(char*)); //allocate the proper memory size from new token
-    strcpy(currMovie->year, token); //now copy the data over
+    currMovie->year = (int)malloc(sizeof(int)); //allocate the proper memory size from new int
+    currMovie->year = atoi(token); //now copy the data over
 
     //third token is the supported languages
     token = strtok_r(NULL, ",", &saveptr); //This should be:                    [a;b;c]
 
     //printf("%s\n", token); //for testing only (need to break up the languages into seperate strings)
     char* temp = (char*)malloc(255 * sizeof(char)); //allocate memory to copy strings to
-    int i;
+    int i, j;
     for (i = 1; i < strlen(token) - 1; i++) { //start at 1 to cut out [ and end at -1 to cut out ]
         temp[i - 1] = token[i]; //make sure we start at index 0 on temp array
     }
@@ -56,6 +65,13 @@ struct movie* addMovie(char* fileLine) {
         langToken = strtok(NULL, ";"); // get next token
     }
 
+    //force all language names to lower for string comparisons
+    for (j = 0; j < count; j++) {
+        for (i = 0; langs[j][i]; i++){
+            langs[j][i] = tolower(langs[j][i]);
+        }
+    }
+
     currMovie->langCount = count;
     currMovie->languages = (char**)malloc(count * sizeof(char*)); //allocate enough space for (count) strings of languages
 
@@ -67,10 +83,6 @@ struct movie* addMovie(char* fileLine) {
         }
     }
 
-
-    // currMovie->languages = (char*)calloc(strlen(token) + 1, sizeof(char*));
-    // strcpy(currMovie->languages, token);
-
     //FREE USED MEMORY
     free(temp);
     free(langs);
@@ -78,9 +90,8 @@ struct movie* addMovie(char* fileLine) {
 
     // //fourth token is the movie rating on a scale of 1 to 10
     token = strtok_r(NULL, "\n", &saveptr);
-    currMovie->rating = (char*)calloc(strlen(token) + 1, sizeof(char*)); //allocate the proper memory size from new token
-    strcpy(currMovie->rating, token); //now copy the data over
-
+    currMovie->rating = (char*)malloc(strlen(token) * sizeof(char*));
+    strcpy(currMovie->rating, token);
     currMovie->next = NULL;
     return currMovie;
 }
@@ -120,7 +131,7 @@ struct movie* processMovieFile(char* fileloc) {
 }
 
 void printMovie(struct movie* movie) {
-    printf("%s, %s, [", movie->title, movie->year);
+    printf("%s, %d, [", movie->title, movie->year);
     int i;
     for (i = 0; i < movie->langCount; i++) {
         printf("%s", movie->languages[i]);
@@ -142,9 +153,8 @@ void printByYear(struct movie* list) {
     printf("Enter the year for which you want to see movies: ");
     scanf("%d", &respyear);
     while (list != NULL) {
-        //printf("list year: %s, resp year: %d\n", list->year, resp);
-        listyear = atoi(list->year);
-        if (listyear == respyear) {
+        //printf("list year: %d, resp year: %d\n", list->year, resp);
+        if (list->year == respyear) {
             printf("%s\n", list->title);
             count++;
         }
@@ -155,27 +165,68 @@ void printByYear(struct movie* list) {
     }
 }
 
-void printBestofYear(struct movie* list) {
 
+void printBestofYear(struct movie* list) {
+    struct bestofyear* BoY;
+    struct bestofyear* prev = NULL;
+    int count = 0;
 
     while (list != NULL) {
+        while (BoY != NULL) {
+            if (BoY->year == list->year) { //matching year, check which movie has a higher rating
+                //convert to float
+
+                //check if list rating is better than BoY rating for cur year
 
 
+            }  //else cur movie rating is equal or less than bestofyear's
+
+            BoY = BoY->next;
+        }
+        //if we got here, we couldn't find an already existing movie from this year, free to add it at the end
+        while (1) {
+            if (BoY == NULL) {
+                //add to end of best of year
+                BoY->title = (char*)malloc(strlen(list->title) * sizeof(char));
+                BoY->title = list->title;
+
+                BoY->year = (int)malloc(sizeof(int));
+                BoY->year = list->year;
+
+                //BoY->rating = malloc(sizeof(float));
+                BoY->rating = strtod(list->rating, NULL);
+
+                BoY->next = NULL; //end of linked list
+                if (prev != NULL) {
+                    prev->next = BoY;
+                }
+                BoY->last = prev;
+                break;
+            }
+            prev = BoY;
+            BoY = BoY->next;
+        }
         list = list->next;
     }
 }
 
 void printByLanguage(struct movie* list) {
-    char* resplang;
+    char resplang[25];// = (char*)malloc(25 * sizeof(char));
     int count, i;
     printf("Enter the language for which you want to see movies: ");
-    scanf("%s", &resplang);
-    while (list != NULL) {
+    scanf("%s", resplang);
 
+    //force all input characters to lower for string comparisons
+    for (i = 0; resplang[i]; i++){
+        resplang[i] = tolower(resplang[i]);
+    }
+
+    while (list != NULL) {
         for (i = 0; i < list->langCount; i++) {
-            if (list->languages[i] == resplang) {
-                printf("%s %s\n", list->year, list->title);
+            if (strcmp(list->languages[i], resplang) == 0) { //if there is a matching language
+                printf("%d %s\n", list->year, list->title);
                 count++;
+                break;
             }
         }
         list = list->next;
@@ -188,7 +239,7 @@ int main(int argc, char** argv) {
         return -1; //error break
     }
     struct movie* MovieList = processMovieFile(argv[1]);
-    printMovieList(MovieList); //for debugging only
+    //printMovieList(MovieList); //for debugging only
 
     //now that the movie list is processed, give the user their 4 options
     printf("Processed file %s and parsed data for %i movies\n\n", argv[1], movie_count);
