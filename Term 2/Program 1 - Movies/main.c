@@ -19,8 +19,6 @@ struct bestofyear {
     char* title;
     int year;
     float rating;
-    struct bestofyear* next;
-    struct bestofyear* last;
 };
 
 struct movie* addMovie(char* fileLine) {
@@ -161,58 +159,64 @@ void printByYear(struct movie* list) {
         list = list->next;
     }
     if (count == 0) {
-        printf("No data about movies released in the year %d\n\n", respyear);
+        printf("No data about movies released in the year %d\n", respyear);
     }
 }
 
-
-void printBestofYear(struct movie* list) {
-    struct bestofyear* BoY;
-    struct bestofyear* prev = NULL;
-    int count = 0;
+void printBestofYear(struct movie* list, int n) {
+    struct bestofyear BoY[n + 1];
+    int count = 0, i, holdNewNode = 0;
 
     while (list != NULL) {
-        while (BoY != NULL) {
-            if (BoY->year == list->year) { //matching year, check which movie has a higher rating
-                //convert to float
+        for (i = 0; i < count; i++) { //check for existing year in BoY
+            //printf("checking if %d == %d\n", BoY[i].year, list->year);
+            if (BoY[i].year == list->year) {
+                float ratingA = strtod(list->rating, NULL);
+                float ratingB = BoY[i].rating;
 
+                //printf("Checking if %f > %f\n", ratingA, ratingB);
                 //check if list rating is better than BoY rating for cur year
-
-
-            }  //else cur movie rating is equal or less than bestofyear's
-
-            BoY = BoY->next;
+                if (ratingA > ratingB) {
+                    //printf("%f is the better rating... ", ratingA);
+                    //make the new rating the BoY rating
+                    BoY[i].title = list->title;
+                    BoY[i].rating = ratingA;
+                    holdNewNode = 1; //we are replacing the existing node
+                    //printf("replacing existing [%d %f] node with: %d %f %s\n", BoY[i].year, ratingB, BoY[i].year, BoY[i].rating, BoY[i].title);
+                    break; //go to next node in list
+                } else {
+                    holdNewNode = 1;
+                    //printf("%f is the lower rating... skipping new node\n", ratingA);
+                    break; // since we found a similar node, we dont want to add another node of the same years
+                }
+            }
         }
         //if we got here, we couldn't find an already existing movie from this year, free to add it at the end
-        while (1) {
-            if (BoY == NULL) {
-                //add to end of best of year
-                BoY->title = (char*)malloc(strlen(list->title) * sizeof(char));
-                BoY->title = list->title;
-
-                BoY->year = (int)malloc(sizeof(int));
-                BoY->year = list->year;
-
-                //BoY->rating = malloc(sizeof(float));
-                BoY->rating = strtod(list->rating, NULL);
-
-                BoY->next = NULL; //end of linked list
-                if (prev != NULL) {
-                    prev->next = BoY;
-                }
-                BoY->last = prev;
-                break;
-            }
-            prev = BoY;
-            BoY = BoY->next;
+        if (holdNewNode == 0) { //add a new node
+            //add to end of best of year (count)
+            BoY[count].title = list->title;
+            BoY[count].year = list->year;
+            BoY[count].rating = strtod(list->rating, NULL);
+            //printf("New Movie Node [%d]: %d %f %s\n", count, BoY[count].year, BoY[count].rating, BoY[count].title);
+            count++;
+        } else {
+            holdNewNode = 0;
         }
         list = list->next;
+    }
+
+    //sort in assending order
+    
+
+    //printf("\n\nBest of Year Rating List generated (%d):\n", count);
+    for (i = 0; i < count; i++) {
+        printf("%d %2f %s\n", BoY[i].year, BoY[i].rating, BoY[i].title);
     }
 }
 
 void printByLanguage(struct movie* list) {
     char resplang[25];// = (char*)malloc(25 * sizeof(char));
-    int count, i;
+    int count = 0, i;
     printf("Enter the language for which you want to see movies: ");
     scanf("%s", resplang);
 
@@ -231,6 +235,9 @@ void printByLanguage(struct movie* list) {
         }
         list = list->next;
     }
+    if (count == 0) {
+        printf("No data about movies released in %s\n", resplang);
+    }
 }
 
 int main(int argc, char** argv) {
@@ -242,11 +249,11 @@ int main(int argc, char** argv) {
     //printMovieList(MovieList); //for debugging only
 
     //now that the movie list is processed, give the user their 4 options
-    printf("Processed file %s and parsed data for %i movies\n\n", argv[1], movie_count);
+    printf("Processed file %s and parsed data for %i movies\n", argv[1], movie_count);
     int resp;
 
     while (1) {
-        printf("1. Show movies released in the specified year\n2. Show highest rated movie for each year\n3. Show the title and year of release of all movies in a specific language\n4. Exit from the program\n\n");
+        printf("\n1. Show movies released in the specified year\n2. Show highest rated movie for each year\n3. Show the title and year of release of all movies in a specific language\n4. Exit from the program\n\n");
         printf("Enter a choice from 1 to 4: ");
         //get user input
         scanf("%d", &resp);
@@ -255,7 +262,7 @@ int main(int argc, char** argv) {
                 printByYear(MovieList);
             break;
             case 2: //show highest rated movie from each year
-                printBestofYear(MovieList);
+                printBestofYear(MovieList, movie_count);
             break;
             case 3: //show the title and year of release of all movies in a specific language
                 printByLanguage(MovieList);
@@ -265,7 +272,7 @@ int main(int argc, char** argv) {
                 return 0;
             break;
             default: //anything else and it should error out
-                printf("You entered an incorrect choice. Try again.\n\n");
+                printf("You entered an incorrect choice. Try again.\n");
             break;
         };
     }
