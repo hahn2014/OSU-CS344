@@ -206,11 +206,11 @@ void printBestofYear(struct movie* list, int n) {
     }
 
     //sort in assending order
-    
+    //qsort(BoY, count, sizeof(BoY[0]), );
 
     //printf("\n\nBest of Year Rating List generated (%d):\n", count);
     for (i = 0; i < count; i++) {
-        printf("%d %2f %s\n", BoY[i].year, BoY[i].rating, BoY[i].title);
+        printf("%d %.2f %s\n", BoY[i].year, BoY[i].rating, BoY[i].title);
     }
 }
 
