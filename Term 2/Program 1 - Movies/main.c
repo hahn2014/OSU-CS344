@@ -163,6 +163,20 @@ void printByYear(struct movie* list) {
     }
 }
 
+void* sortBoY(struct bestofyear BoY[], int count) {
+    int i, j;
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < (count); j++) {
+            if (BoY[j].year < BoY[i].year) {
+                int tmp = BoY[i].year;
+                BoY[i].year = BoY[j].year;
+                BoY[j].year = tmp;
+            }
+        }
+    }
+    return BoY;
+}
+
 void printBestofYear(struct movie* list, int n) {
     struct bestofyear BoY[n + 1];
     int count = 0, i, holdNewNode = 0;
@@ -204,11 +218,15 @@ void printBestofYear(struct movie* list, int n) {
         }
         list = list->next;
     }
+    printf("\n\nDebugging: Before qsort best of year listing\n");
+    for (i = 0; i < count; i++) {
+        printf("%d %.2f %s\n", BoY[i].year, BoY[i].rating, BoY[i].title);
+    }
 
     //sort in assending order
-    //qsort(BoY, count, sizeof(BoY[0]), );
+    //BoY = (struct bestofyear)sortBoY(BoY, count);
 
-    //printf("\n\nBest of Year Rating List generated (%d):\n", count);
+    printf("\n\nDebugging: After qsort best of year listing (%d):\n", count);
     for (i = 0; i < count; i++) {
         printf("%d %.2f %s\n", BoY[i].year, BoY[i].rating, BoY[i].title);
     }
