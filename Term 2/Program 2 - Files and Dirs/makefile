@@ -1,10 +1,9 @@
-CC=gcc
-CFLAGS=-I.
-DEPS = main.c
-OBJ = movieDirs.o
+build:
+	gcc --std=gnu99 -o movieDirs main.c
 
-%.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+run:
+	./movieDirs
 
-movieDirs: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS)
+
+clean:
+	rm -f -r hahnb.movies.*
