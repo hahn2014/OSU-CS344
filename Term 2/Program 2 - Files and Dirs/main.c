@@ -12,8 +12,6 @@
 struct movie {
     char* title;
     int year;
-    int langCount;
-    char** languages;
     float rating;
 };
 
@@ -132,17 +130,26 @@ char* itoa(int val) {
 
 /*
  * get line count function courtesy of
- *   https://www.geeksforgeeks.org/c-program-count-number-lines-file/
+ *   https://www.tutorialspoint.com/c-program-to-count-the-number-of-lines-in-a-file
  */
 int getLineCount(char* filename) {
     FILE* fp = fopen(filename, "r");
-    char c;
+    char ch;
     int count = 0;
-    //loop through file looking for new line chars (get line count)
-    for (c = getc(fp); c != EOF; c = getc(fp)) {
-        if (c == '\n') // Increment count if this character is newline
-            count++;
+    //open file in read more
+    //printf("getting line count of %s\n", filename);
+    if (fp == NULL) {
+        printf("File \"%s\" does not exist!!!\n", filename);
+        return -1;
     }
+
+    //read character by character and check for new line
+    while ((ch = fgetc(fp)) != EOF) {
+        if (ch == '\n') {
+            count++;
+        }
+    }
+    //close the file
     fclose(fp);
     return count;
 }
@@ -162,67 +169,22 @@ struct movie addMovie(char* fileLine) {
 
     //second token is the movie release year
     token = strtok_r(NULL, ",", &saveptr);
-    currMovie.year = (int)malloc(sizeof(int)); //allocate the proper memory size from new int
+    //currMovie.year = (int)malloc(sizeof(int)); //allocate the proper memory size from new int
     currMovie.year = atoi(token); //now copy the data over
 
     //third token is the supported languages
     token = strtok_r(NULL, ",", &saveptr); //This should be:                    [a;b;c]
 
-    //printf("%s\n", token); //for testing only (need to break up the languages into seperate strings)
-    char* temp = (char*)malloc(255 * sizeof(char)); //allocate memory to copy strings to
-    int i, j;
-    for (i = 1; i < strlen(token) - 1; i++) { //start at 1 to cut out [ and end at -1 to cut out ]
-        temp[i - 1] = token[i]; //make sure we start at index 0 on temp array
-    }
-
-    //printf("%s\n", temp); //at this point we have removed the brackets:       a;b;c
-
-    //process each language by seperating each from the ;
-    char** langs = (char**)malloc(20 * sizeof(char*));
-    int count = 0;
-    char* langToken = strtok(temp, ";");
-    while (langToken != NULL) {
-        // iterate through each token within the temp string and parse the tokens
-        //printf("currentToken = %s\n", langToken);
-        langs[count] = (char*)malloc(strlen(langToken) * sizeof(char));
-        strcpy(langs[count], langToken);
-        count++;
-        langToken = strtok(NULL, ";"); // get next token
-    }
-
-    //force all language names to lower for string comparisons
-    for (j = 0; j < count; j++) {
-        for (i = 0; langs[j][i]; i++){
-            langs[j][i] = tolower(langs[j][i]);
-        }
-    }
-
-    currMovie.langCount = count;
-    currMovie.languages = (char**)malloc(count * sizeof(char*)); //allocate enough space for (count) strings of languages
-
-    for (i = 0; i < count; i++) {
-        if (langs[i] != NULL) {
-            //printf("%s\n", langs[i]);//finally we have each lang individually: a  \n  b  \n  c
-            currMovie.languages[i] = (char*)malloc(strlen(langs[i]) * sizeof(char));
-            currMovie.languages[i] = langs[i];
-        }
-    }
-
-    //FREE USED MEMORY
-    free(temp);
-    free(langs);
-
+        //we can skip this part because we don't need languages
 
     // //fourth token is the movie rating on a scale of 1 to 10
     token = strtok_r(NULL, "\n", &saveptr);
     currMovie.rating = strtof(token, NULL);
-    //currMovie->rating = (char*)malloc(strlen(token) * sizeof(char*));
-    //strcpy(currMovie->rating, token);
     return currMovie;
 }
 
 struct movie* processFile(char* fileloc, int movieCount) {
-    printf("reading file %s with %d entries\n", fileloc, movieCount);
+    //printf("reading file %s with %d entries\n", fileloc, movieCount);
     FILE* datafile = fopen(fileloc, "r");
 
     char* currLine = NULL; //initialize our line reading address
@@ -231,7 +193,7 @@ struct movie* processFile(char* fileloc, int movieCount) {
     char* token;
     int count = 0;
 
-    struct movie* movies = (struct movie*)calloc(movieCount - 1, sizeof(struct movie)); //moviecount - 1 to excluse the file guide at the top
+    struct movie* movies = (struct movie*)calloc(movieCount, sizeof(struct movie)); //moviecount - 1 to excluse the file guide at the top
 
     // Read the file line by line
     while ((nread = getline(&currLine, &len, datafile)) != -1) {
@@ -254,41 +216,41 @@ void processMovieFile(char* filename) {
         randIndex = rand() % 100000;
         char dst[20] = "hahnb.movies.";
         strcat(dst, itoa(randIndex));
-        printf("attempting to create new dir %s\n", dst);
+        //printf("attempting to create new dir %s\n", dst);
 
         DIR* dir = opendir(dst);
         if (dir) { //directory exists
-            printf("error! dir already exists.. running again.\n");
+            //printf("error! dir already exists.. running again.\n");
             closedir(dir);
             continue;
         } else if (ENOENT == errno) { //directory does not exist! Create it..
             if (mkdir(dst, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP) == 0) { //user can: R,W,E, group: R
-                printf("%s succesfully created!\n", dst);
+                //printf("%s succesfully created!\n", dst);
 
                 count = getLineCount(filename);
                 movies = processFile(filename, count); //add movie data to our struct array
 
                 dir = opendir(dst);
                 if (dir) {   //make sure we succesfully created and moved into the new dir
+                    printf("Created directory with name %s\n\n", dst);
                     for (i = 1; i < count; i++) {
-                        printf("Movie [%d/%d]: %d %s %.2f\n", i, (count - 1), movies[i].year, movies[i].title, movies[i].rating);
-
-                        char* yearfile;
+                        char* yearfile = (char*)malloc(8 * sizeof(char)); //year (4) + . (1) + txt (3) = 8
                         sprintf(yearfile, "%s/%d.txt", dst, movies[i].year);
+                        //printf("new year file: %s\n", yearfile);
 
-                        FILE* year;
-                        year = fopen(yearfile, "a+"); //a+ for appending a write to the end of the file
-                        //since we are appending to already existing files, we can simply
-                        //just keep writing till we looped through all movies in the list
+                        FILE* year = fopen(yearfile, "a+"); //a+ for appending a write to the end of the file
+                        //     //since we are appending to already existing files, we can simply
+                        //     //just keep writing till we looped through all movies in the list
                         fprintf(year, "%s\n", movies[i].title);
                         fclose(year);
                     }
+                    closedir(dir);
+                    return; //at this point we've gone through all the movies, go back to main menu
                 } else {
-                    printf("Failed to create a directory.. Shutting down.\n");
-                    exit(-1);
+                    printf("Failed to create a directory.. Try again.\n");
+                    return;
                 }
             }
-            exit(-1);
         }
     }
 }
